@@ -237,6 +237,9 @@ struct dsi_panel {
 	u32 doze_backlight_threshold;
 
 	int hbm_mode;
+
+	bool dc_enable;
+	u32 dc_threshold;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)

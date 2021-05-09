@@ -5103,12 +5103,51 @@ error:
 	return ret == 0 ? count : ret;
 }
 
+static ssize_t sysfs_dc_enable_read(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int dc_enable;
+	struct dsi_display *display = dev_get_drvdata(dev);
+
+	if (!display->panel)
+		return 0;
+
+	dc_enable = (true == display->panel->dc_enable ? 1 : 0);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", dc_enable);
+}
+
+static ssize_t sysfs_dc_enable_write(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct dsi_display *display = dev_get_drvdata(dev);
+	int ret, dc_enable;
+
+	if (!display->panel)
+		return -EINVAL;
+
+	ret = kstrtoint(buf, 2, &dc_enable);
+	if (ret) {
+		pr_err("kstrtoint failed. ret=%d\n", ret);
+		return ret;
+	}
+
+	mutex_lock(&display->display_lock);
+	display->panel->dc_enable = (0 == dc_enable ? false : true);
+	mutex_unlock(&display->display_lock);
+	return 0;
+}
+
 static DEVICE_ATTR(hbm, 0644,
 			sysfs_hbm_read,
 			sysfs_hbm_write);
 
+static DEVICE_ATTR(dc_enable, 0644,
+				   sysfs_dc_enable_read,
+				   sysfs_dc_enable_write);
+
 static struct attribute *display_fs_attrs[] = {
 	&dev_attr_hbm.attr,
+	&dev_attr_dc_enable.attr,
 	NULL,
 };
 static struct attribute_group display_fs_attrs_group = {

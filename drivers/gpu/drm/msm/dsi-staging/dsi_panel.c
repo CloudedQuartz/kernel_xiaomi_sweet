@@ -711,6 +711,52 @@ error:
 	return rc;
 }
 
+static int dsi_panel_update_dc_backlight(struct dsi_panel *panel, u32 bl_lvl)
+{
+	int i = 0;
+	int crcValue = 255;
+	float mDCBLCoeff[2] = {0.5125, 4.9};
+	struct dsi_cmd_desc *cmds = NULL;
+	struct dsi_display_mode_priv_info *priv_info = panel->cur_mode->priv_info;
+	int writeCmd[21] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1};
+	u8 *tx_buf;
+
+	if (!(bl_lvl < panel->dc_threshold) || bl_lvl == 0 || panel->doze_enabled)
+		return 1;
+
+	crcValue = 0.5 + mDCBLCoeff[0] * bl_lvl + mDCBLCoeff[1]; //0.5 is for roundin
+
+	if (crcValue > 255)
+		crcValue = 255;
+	else if (crcValue < panel->bl_config.bl_min_level)
+		crcValue = panel->bl_config.bl_min_level;
+	else if (bl_lvl > panel->dc_threshold)
+		crcValue = 255;
+
+	if (panel->cur_mode->timing.refresh_rate == 60) {
+		cmds = priv_info->cmd_sets[DSI_CMD_SET_DISP_DC_CRC_SETTING_60HZ].cmds;
+		if (cmds) {
+			tx_buf = (u8 *)cmds[4].msg.tx_buf;
+			for (i = 0; i < 21; i++) {
+				writeCmd[i] = writeCmd[i] * (int)crcValue;
+				tx_buf[1+i] = writeCmd[i];
+			}
+		}
+		dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_DISP_DC_CRC_SETTING_60HZ);
+	} else {
+		cmds = priv_info->cmd_sets[DSI_CMD_SET_DISP_DC_CRC_SETTING_120HZ].cmds;
+		if (cmds) {
+			tx_buf = (u8 *)cmds[4].msg.tx_buf;
+			for (i = 0; i < 21; i++) {
+				writeCmd[i] = writeCmd[i] * (int)crcValue;
+				tx_buf[1+i] = writeCmd[i];
+			}
+		}
+		dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_DISP_DC_CRC_SETTING_120HZ);
+	}
+	return 0;
+}
+
 static u32 dsi_panel_get_backlight(struct dsi_panel *panel)
 {
 	u32 bl_level;
@@ -734,6 +780,9 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 
 	if (panel->host_config.ext_bridge_num)
 		return 0;
+
+	if (panel->dc_enable)
+		return dsi_panel_update_dc_backlight(panel, bl_lvl);
 
 	pr_debug("backlight type:%d lvl:%d\n", bl->type, bl_lvl);
 	switch (bl->type) {
@@ -1799,6 +1848,8 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-doze-lbm-command",
 	"qcom,mdss-dsi-dispparam-hbm-on-command",
 	"qcom,mdss-dsi-dispparam-hbm-off-command",
+	"qcom,mdss-dsi-dispparam-60hz-dc-crc-setting-command",
+	"qcom,mdss-dsi-dispparam-120hz-dc-crc-setting-command",
 };
 
 const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
@@ -1829,6 +1880,8 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-doze-lbm-command-state",
 	"qcom,mdss-dsi-dispparam-hbm-on-command-state",
 	"qcom,mdss-dsi-dispparam-hbm-off-command-state",
+	"qcom,mdss-dsi-dispparam-60hz-dc-crc-setting-command-state",
+	"qcom,mdss-dsi-dispparam-120hz-dc-crc-setting-command-state",
 };
 
 static int dsi_panel_get_cmd_pkt_count(const char *data, u32 length, u32 *cnt)
@@ -2419,6 +2472,17 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 	} else {
 		panel->bl_config.bl_doze_hbm = val;
 	}
+
+	rc = utils->read_u32(utils->data,
+			"qcom,mdss-dsi-panel-dc-threshold", &val);
+	if (rc) {
+		panel->dc_threshold = 488;
+		pr_info("default dc backlight threshold is %d\n", panel->dc_threshold);
+	} else {
+		panel->dc_threshold = val;
+	}
+
+	panel->dc_enable = false;
 
 	panel->bl_config.bl_inverted_dbv = utils->read_bool(utils->data,
 		"qcom,mdss-dsi-bl-inverted-dbv");

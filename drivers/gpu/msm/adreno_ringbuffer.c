@@ -92,6 +92,10 @@ static void adreno_ringbuffer_wptr(struct adreno_device *adreno_dev,
 	struct adreno_gpudev *gpudev = ADRENO_GPU_DEVICE(adreno_dev);
 	unsigned long flags;
 	int ret = 0;
+	static DEFINE_SPINLOCK(locky);
+	static u64 total, count;
+	volatile ktime_t tstart, stop;
+	unsigned long irq_flags;
 
 	spin_lock_irqsave(&rb->preempt_lock, flags);
 	if (adreno_in_preempt_state(adreno_dev, ADRENO_PREEMPT_NONE)) {
@@ -118,9 +122,24 @@ static void adreno_ringbuffer_wptr(struct adreno_device *adreno_dev,
 			 * Ensure the write posted after a possible
 			 * GMU wakeup (write could have dropped during wakeup)
 			 */
+
+			local_irq_save(irq_flags);
+			tstart = ktime_get();
+
 			ret = adreno_gmu_fenced_write(adreno_dev,
 				ADRENO_REG_CP_RB_WPTR, rb->_wptr,
 				FENCE_STATUS_WRITEDROPPED0_MASK);
+
+			stop = ktime_get();
+			spin_lock(&locky);
+			if (smp_processor_id() == 7) {
+				total += ktime_to_ns(ktime_sub(stop, tstart));
+				count++;
+				printk("SARU: %llu ns\n", total / count);
+			}
+			spin_unlock(&locky);
+			local_irq_restore(irq_flags);
+
 			rb->skip_inline_wptr = false;
 			if (gpudev->gpu_keepalive)
 				gpudev->gpu_keepalive(adreno_dev, false);

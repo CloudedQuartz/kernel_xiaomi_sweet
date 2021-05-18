@@ -65,6 +65,43 @@ static unsigned int cur_refresh_rate = 60;
 
 struct dsi_display *primary_display;
 
+void dsi_display_panel_gamma_mode_change(struct dsi_display *display,
+										 struct dsi_display_mode *adj_mode)
+{
+	u32 count = 0;
+	int rc = 0;
+	struct dsi_display_mode *cur_mode = NULL;
+	
+	if (!display || !adj_mode || !display->panel) {
+		pr_err("Invalid params\n");
+		return;
+	}
+	
+	cur_mode = display->panel->cur_mode;
+	if (!cur_mode) {
+		pr_err("Invalid params\n");
+		return;
+	}
+	
+	count = display->panel->cur_mode->priv_info->cmd_sets[DSI_CMD_SET_DISP_BC_120HZ].count;
+	if (!count) {
+		pr_info("No need to change panel gamma\n");
+		return;
+	}
+	
+	if (adj_mode->timing.refresh_rate == 120)
+		rc = panel_disp_param_send_lock(display->panel, DISPPARAM_BC_120HZ);
+	else if (adj_mode->timing.refresh_rate == 60)
+		rc = panel_disp_param_send_lock(display->panel, DISPPARAM_BC_60HZ);
+	
+	if (rc)
+		pr_err("%s: send cmds failed...", __func__);
+	else
+		pr_info("%s: refresh_rate[%d]\n", __func__, adj_mode->timing.refresh_rate);
+	
+	return;
+}
+
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
 {
@@ -6829,6 +6866,9 @@ int dsi_display_set_mode(struct dsi_display *display,
 		pr_err("[%s] failed to set mode\n", display->name);
 		goto error;
 	}
+
+	if (adj_mode.timing.refresh_rate == 60)
+		dsi_display_panel_gamma_mode_change(display, &adj_mode);
 
 	if (!display->panel->cur_mode) {
 		display->panel->cur_mode =

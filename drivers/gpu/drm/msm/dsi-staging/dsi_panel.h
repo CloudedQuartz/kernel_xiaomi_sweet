@@ -82,6 +82,10 @@ enum dsi_panel_physical_type {
 	DSI_DISPLAY_PANEL_TYPE_MAX,
 };
 
+enum DISPPARAM_MODE {
+	DISPPARAM_BC_120HZ = 0x60000,
+	DISPPARAM_BC_60HZ = 0x70000,
+};
 struct dsi_dfps_capabilities {
 	enum dsi_dfps_type type;
 	u32 min_refresh_rate;
@@ -364,4 +368,5 @@ int dsi_panel_update_lp_mode(struct dsi_panel *panel);
 
 int dsi_panel_apply_hbm_mode(struct dsi_panel *panel);
 
+int panel_disp_param_send_lock(struct dsi_panel *panel, int param);
 #endif /* _DSI_PANEL_H_ */

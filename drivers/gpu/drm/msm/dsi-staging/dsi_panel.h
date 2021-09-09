@@ -273,6 +273,7 @@ struct dsi_panel {
 	u32 dc_threshold;
 	u32 dc_type;
 	bool resend_dc;
+	int current_gamma;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)
@@ -406,5 +407,8 @@ int dsi_panel_apply_hbm_mode(struct dsi_panel *panel);
 int dsi_panel_apply_dc_mode(struct dsi_panel *panel);
 
 int dsi_panel_apply_cabc_mode(struct dsi_panel *panel);
+
+void dsi_panel_gamma_mode_change(struct dsi_panel *panel,
+            struct dsi_display_mode *adj_mode, bool force);
 
 #endif /* _DSI_PANEL_H_ */

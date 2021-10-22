@@ -8186,10 +8186,6 @@ static void __exit dsi_display_unregister(void)
 void dsi_display_panel_gamma_mode_change(struct dsi_display *display,
 			struct dsi_display_mode *adj_mode, bool force)
 {
-	u32 count = 0;
-	int rc = 0;
-	struct dsi_display_mode *cur_mode = NULL;
-
 	if (!display || !adj_mode || !display->panel) {
 		pr_err("Invalid params\n");
 		return;

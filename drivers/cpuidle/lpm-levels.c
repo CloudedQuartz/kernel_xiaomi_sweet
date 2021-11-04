@@ -69,8 +69,9 @@ struct lpm_cluster *lpm_root_node;
 static bool lpm_prediction = true;
 module_param_named(lpm_prediction, lpm_prediction, bool, 0664);
 
-static bool cluster_use_deepest_state = true;
-module_param(cluster_use_deepest_state, bool, 0664);
+static bool cluster_use_deepest_state = false;
+// temp set to read only for debugging
+module_param(cluster_use_deepest_state, bool, 0444);
 
 static uint32_t bias_hyst;
 module_param_named(bias_hyst, bias_hyst, uint, 0664);
